@@ -1,0 +1,35 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Environment variables
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local development
+*.log
+logs/
+
+# Project specific
+alembic/versions/*
+!alembic/versions/.gitkeep
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
