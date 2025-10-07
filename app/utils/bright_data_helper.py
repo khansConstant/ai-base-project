@@ -123,29 +123,6 @@ def poll_progress(snapshot_id: str, max_attempts: int = 60, delay: int = 5) -> b
     return False
 
 
-def trigger_scrape_glassdoor_comments(dataset_id: str, urls: list,days: int = 1825) -> dict:
-    """
-    Trigger a Bright Data scrape job for LinkedIn (or similar URLs).
-    
-    Args:
-        dataset_id (str): The dataset ID configured in Bright Data.
-        urls (list): List of profile URLs to scrape.
-    
-    Returns:
-        dict: Trigger response containing job info (including snapshot ID).
-    """
-    payload = [{"url": u,"days":1825} for u in urls]
-
-    response = requests.post(
-        f"{BASE_URL}/trigger?dataset_id={dataset_id}&include_errors=true",
-        headers=HEADERS,
-        json=payload
-    )
-    print(response.json(),'response.json()')
-    response.raise_for_status()
-    return response.json()
-
-
 
 
 def get_snapshot(snapshot_id: str, fmt: str = "json", poll_interval: int = 30, max_attempts: int = 10) -> dict | None:

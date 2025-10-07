@@ -45,6 +45,8 @@ def update_table_row(
         SET {set_clause}
         WHERE {id_column} = :id_param
     """
+
+    print(query,'query')
     
     if return_updated:
         query += " RETURNING *"

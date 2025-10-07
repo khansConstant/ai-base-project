@@ -78,6 +78,7 @@ async def enrich_leads(
                     text("""
                             SELECT 
                                 l.id AS lead_id,
+                                c.id as company_id,
                                 l.name As name,
                                 c.name As company_name,
                                 l.lead_details,

@@ -3,6 +3,7 @@ from sqlalchemy import text
 from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
 import uuid
+import json
 from sqlalchemy import func 
 from .company_service import get_or_create_company
 from ..utils.db_utils import update_table_row
@@ -182,6 +183,57 @@ def get_leads(
     """
     params.update({'skip': skip, 'limit': limit})
     
-    # Execute the query
-    result = db.execute(text(query), params)
-    return [dict(row) for row in result.mappings()]
+def update_lead_with_enrichment(db: Session, lead_id: str, final_state: Dict[str, Any]) -> bool:
+    try:
+        update_data = {
+            'linkedin_url': final_state.get('linkedin_url'),
+            'lead_details': final_state.get('lead_details'),
+            'linkedin_details_raw': final_state.get('linkedin_details_raw'),
+            'linkedin_details': final_state.get('linkedin_details'),
+            'lead_score': final_state.get('lead_score'),
+            'engagement_metrics': final_state.get('engagement_metrics'),
+            'stage_metadata': final_state.get('stage_metadata'),
+            'content': final_state.get('content'),
+            'google_results': final_state.get('google_results'),
+            'company_search_results': final_state.get('company_search_results'),
+            'glassdoor_comments': final_state.get('glassdoor_details'),
+        }
+
+        print(update_data,'update_data_lead')
+        
+        # Serialize dicts and lists, handle JSON strings
+        for key, value in update_data.items():
+            if isinstance(value, str):
+                try:
+                    value = json.loads(value)
+                except:
+                    pass
+            if isinstance(value, (dict, list)):
+                update_data[key] = json.dumps(value, default=str)
+        
+        # Drop None values
+        update_data = {k: v for k, v in update_data.items() if v is not None}
+        
+        if update_data:
+            set_clause = ", ".join(f"{k} = :{k}" for k in update_data.keys())
+            
+            query = f"""
+                UPDATE leads
+                SET {set_clause}, updated_at = NOW()
+                WHERE id = :id
+                RETURNING *
+            """
+            
+            update_data['id'] = lead_id
+            
+            result = db.execute(text(query), update_data)
+            db.commit()
+            lead = result.mappings().first()
+            return lead is not None
+        
+        return True  # No updates needed
+    
+    except Exception as e:
+        db.rollback()
+        raise e
+

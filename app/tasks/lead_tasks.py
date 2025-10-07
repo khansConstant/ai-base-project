@@ -1,6 +1,8 @@
 from enum import Enum
 from typing import Dict, List, Optional, TypedDict, Annotated
-from app.database.base import SessionLocal
+from app.database.base import get_db
+from app.services.company_service import update_company_with_enrichment, update_enrichment_job
+from app.services.lead_service import update_lead_with_enrichment
 from app.utils.ai_lead_scoring import AIScoringEngine
 from app.utils.bright_data_helper import get_snapshot, poll_progress, trigger_scrape, trigger_scrape_glassdoor_comments
 from app.utils.prompts import get_company_insights_messages, get_company_linkedin_url_messages, get_company_summary_messages, get_glassdoor_analysis_messages, get_glassdoor_url_messages, get_linkedin_company_analysis_messages, get_linkedin_profile_analysis_messages, get_linkedin_url_messages
@@ -13,10 +15,11 @@ from sqlalchemy import text
 import logging
 from langchain.chat_models import init_chat_model
 import json
+from ..database.base import get_db
 
 logger = logging.getLogger(__name__)
 
-llm = init_chat_model("gpt-4o")
+llm = init_chat_model("gpt-4o-mini")
 
 # --- Data Models ---
 
@@ -35,6 +38,7 @@ class State(TypedDict):
     company_search_results: Optional[str]  
     company_linkedin_url: Optional[str]
     company_linkedin_details: Optional[dict]
+    company_linkedin_analysis: Optional[dict]
     glassdoor_url: Optional[str]
     glassdoor_details: Optional[dict]
     glassdoor_analysis: Optional[dict]
@@ -86,12 +90,26 @@ class GlassdoorAnalysisModel(BaseModel):
     key_issues: List[str]
     summary: str
 
+class RecentNews(BaseModel):
+    title: str
+    summary: str
+    relevance: str
+    potential_opportunity: str
+
+
+class ConversationStarter(BaseModel):
+    topic: str
+    relevance: str
+    talking_point: str
+
+
 class CompanyInsightsModel(BaseModel):
-    recent_news: List[str] = Field(default_factory=list)
+    recent_news: List[RecentNews] = Field(default_factory=list)
     leadership_changes: List[str] = Field(default_factory=list)
     funding_events: List[str] = Field(default_factory=list)
     strategic_initiatives: List[str] = Field(default_factory=list)
-    conversation_starters: List[str] = Field(default_factory=list)
+    industry_trends: List[str] = Field(default_factory=list)
+    conversation_starters: List[ConversationStarter] = Field(default_factory=list)
 
 class LeadEngagement(BaseModel):
     emails_opened: int = 0
@@ -220,6 +238,7 @@ def analyze_linkedin(state: State) -> dict:
     try:
         # Check if linkedin_details already exists in state
         existing_details = state.get("linkedin_details")
+
         if existing_details is not None:
             logger.info("[ANALYZE_LINKEDIN] LinkedIn details already exist, skipping analysis.")
             return {"linkedin_details": existing_details}
@@ -366,6 +385,7 @@ def analyze_company_linkedin(state: State) -> dict:
         analysis = structured_llm.invoke(messages)
 
         print("✅Company LinkedIn profile analyzed successfully")
+
         return {"company_linkedin_analysis": analysis.model_dump()}
     except Exception as e:
         logger.error(f"[ANALYZE_COMPANY_LINKEDIN] Error: {str(e)}")
@@ -375,12 +395,17 @@ def score_lead(state: State) -> dict:
     """Score lead based on profile and company data."""
     logger.info("[SCORE_LEAD] Starting lead scoring...")
     try:
-        # Implementation will go here
+        # Implementation will go herehere
+        existing_url = state.get("lead_score")
+        if existing_url is not None:
+            logger.info("[SCORE_LEAD] Lead score already exists, skipping search.")
+            return {"lead_score": existing_url}
+
         linkedin_details = state.get("linkedin_details", {})
-        company_linkedin_analysis = state.get("company_linkedin_analysis", {})
+        company_linkedin_details = state.get("company_linkedin_details", {})
 
         scoring_engine = AIScoringEngine()
-        core = scoring_engine.score_lead(linkedin_details, company_linkedin_analysis)
+        core = scoring_engine.score_lead(linkedin_details, company_linkedin_details)
 
         return {"lead_score": core}
     except Exception as e:
@@ -454,7 +479,7 @@ def scrape_glassdoor(state: State) -> dict:
             print("❌ No Glassdoor URL provided for scraping")
             return {"glassdoor_details": None}
         
-        dataset_id = "gd_l1vikfnt1wgvvqz95w"
+        dataset_id = "gd_l7j1po0921hbu0ri1z"
         trigger_res = trigger_scrape_glassdoor_comments(dataset_id, [glassdoor_url])
         
         snapshot_id = trigger_res.get("snapshot_id")
@@ -535,7 +560,7 @@ def find_company_insights(state: State) -> dict:
             logger.info("[FIND_COMPANY_INSIGHTS] Company insights already exists, skipping search.")
             return {"company_insights": existing_url}
         
-        if not state.get("company_linkedin_analysis") and not state.get("glassdoor_analysis"):
+        if not state.get("company_linkedin_details") and not state.get("glassdoor_analysis"):
             print("❌ No company data available for analysis")
             return {"company_insights": None}
     
@@ -679,102 +704,40 @@ def enrich_lead_task(lead_data: Dict[str, any]) -> Dict[str, any]:
 
         
         # Update database with enriched data
-        db = SessionLocal()
+        db = next(get_db())
         try:
-            print("Starting database update...")
-            with db.begin():
-                # Update leads
-                print("Updating leads table...")
-                result = db.execute(text("""
-                    UPDATE leads SET
-                        linkedin_url = :linkedin_url,
-                        lead_details = :lead_details,
-                        linkedin_details_raw = :linkedin_details_raw,
-                        linkedin_details = :linkedin_details,
-                        lead_score = :lead_score,
-                        engagement_metrics = :engagement_metrics,
-                        stage_metadata = :stage_metadata,
-                        content = :content,
-                        google_results = :google_results,
-                        company_search_results = :company_search_results,
-                        glassdoor_comments = :glassdoor_comments,
-                        updated_at = NOW()
-                    WHERE id = :lead_id
-                """), {
-                    'linkedin_url': final_state.get('linkedin_url'),
-                    'lead_details': json.dumps(final_state.get('lead_details'), default=str),
-                    'linkedin_details_raw': json.dumps(final_state.get('linkedin_details_raw'), default=str),
-                    'linkedin_details': json.dumps(final_state.get('linkedin_details'), default=str),
-                    'lead_score': json.dumps(final_state.get('lead_score'), default=str),
-                    'engagement_metrics': json.dumps(final_state.get('engagement_metrics'), default=str),
-                    'stage_metadata': json.dumps(final_state.get('stage_metadata'), default=str),
-                    'content': final_state.get('content'),
-                    'google_results': json.dumps(final_state.get('google_results'), default=str),
-                    'company_search_results': json.dumps(final_state.get('company_search_results'), default=str),
-                    'glassdoor_comments': json.dumps(final_state.get('glassdoor_details'), default=str),
-                    'lead_id': lead.get('id')
-                })
-                print(f"Leads table rows affected: {result.rowcount}")
-
-                # Update companies
-                print("Updating companies table...")
-                result = db.execute(text("""
-                    UPDATE companies SET
-                        linkedin_url = :linkedin_url,
-                        glassdoor_url = :glassdoor_url,
-                        website = :website,
-                        linkedin_details = :linkedin_details,
-                        linkedin_analysis = :linkedin_analysis,
-                        glassdoor_details = :glassdoor_details,
-                        glassdoor_analysis = :glassdoor_analysis,
-                        company_insights = :company_insights,
-                        updated_at = NOW()
-                    WHERE id = :company_id
-                """), {
-                    'linkedin_url': final_state.get('company_linkedin_url'),
-                    'glassdoor_url': final_state.get('glassdoor_url'),
-                    'website': (final_state.get('company_search_results') or {}).get('summary'),
-                    'linkedin_details': json.dumps(final_state.get('company_linkedin_details'), default=str),
-                    'linkedin_analysis': json.dumps(final_state.get('company_linkedin_analysis'), default=str),
-                    'glassdoor_details': json.dumps(final_state.get('glassdoor_details'), default=str),
-                    'glassdoor_analysis': json.dumps(final_state.get('glassdoor_analysis'), default=str),
-                    'company_insights': json.dumps(final_state.get('company_insights'), default=str),
-                    'company_id': lead.get('company_id')
-                })
-                print(f"Companies table rows affected: {result.rowcount}")
-
-                # Update enrichment_jobs
-                print("Updating enrichment_jobs table...")
-                result = db.execute(text("""
-                    UPDATE enrichment_jobs SET
-                        status = 'completed',
-                        result = :result,
-                        updated_at = NOW()
-                    WHERE lead_id = :lead_id
-                """), {
-                    'result': json.dumps(final_state, default=str),
-                    'lead_id': lead.get('id')
-                })
-                print(f"Enrichment jobs table rows affected: {result.rowcount}")
+            # Handle JSON strings in final_state
+            lead_details = final_state.get('lead_details')
+            if isinstance(lead_details, str):
+                lead_details = json.loads(lead_details)
+            if not isinstance(lead_details, dict) or 'lead_id' not in lead_details:
+                raise ValueError("Invalid lead_details: missing 'lead_id'")
+            lead_id = lead_details['lead_id']
+            
+            company_id = lead_details.get('company_id')
+            
+            # Update lead
+            update_lead_with_enrichment(db, lead_id, final_state)
+            # Update company
+            update_company_with_enrichment(db, company_id, final_state)
+            # Update enrichment job
+            update_enrichment_job(db, lead_id, 'completed', final_state)
 
             db.commit()
-
-            print("Database update completed successfully")
             logger.info("[ENRICH_LEAD] Database updated successfully")
         except Exception as e:
-            print(f"Error updating database: {str(e)}")
             logger.error(f"[ENRICH_LEAD] Error updating database: {str(e)}")
             db.rollback()
         finally:
             db.close()
         
         # Write final status to file
-        try:
-            with open('/tmp/enrichment_status.json', 'w') as f:
-                json.dump(final_state, f, default=str, indent=4)
-            print("Final status written to /tmp/enrichment_status.json")
-        except Exception as e:
-            print(f"Error writing status to file: {str(e)}")
+        # try:
+        #     with open('/tmp/enrichment_status.json', 'w') as f:
+        #         json.dump(final_state, f, default=str, indent=4)
+        #     print("Final status written to /tmp/enrichment_status.json")
+        # except Exception as e:
+        #     print(f"Error writing status to file: {str(e)}")
         
         logger.info("[ENRICH_LEAD] Lead enrichment completed successfully")
         return final_state
