@@ -6,27 +6,38 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Settings(BaseSettings):
+    """
+    Application settings loaded from environment variables.
+    Add your custom settings here as needed.
+    """
+    # Application
     APP_ENV: str = os.getenv("APP_ENV", "development")
+    APP_NAME: str = os.getenv("APP_NAME", "FastAPI Skeleton")
     DEBUG: bool = os.getenv("DEBUG", "False").lower() in ("true", "1", "t")
-    
-    # Database
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://user:password@localhost:5432/ai_cmo_db")
     
     # Security
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-here")
     ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
 
-    # Celery
-    CELERY_BROKER_URL: str = "redis://redis:6379/0"
-    CELERY_RESULT_BACKEND: str = "redis://redis:6379/0"
+    # Celery & Redis
+    CELERY_BROKER_URL: str = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
+    CELERY_RESULT_BACKEND: str = os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/0")
 
-    BRIGHTDATA_API_KEY: str = os.getenv("BRIGHTDATA_API_KEY", "your-secret-key-here")
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "your-secret-key-here")
+
+    # Optional: Database (uncomment if needed)
+    # DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://user:password@localhost:5432/your_db")
+    
+    # Optional: Add your API keys here
+    # OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    # EXTERNAL_API_KEY: str = os.getenv("EXTERNAL_API_KEY", "")
     
     class Config:
         env_file = ".env"
+        extra = "ignore"  # Ignore extra fields from .env file
 
 @lru_cache()
 def get_settings() -> Settings:
+    """Get cached settings instance"""
     return Settings()

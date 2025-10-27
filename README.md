@@ -1,67 +1,43 @@
-# AI CMO API
+# FastAPI Skeleton Project
 
-AI Marketing Assistant API built with FastAPI, PostgreSQL, and Redis.
+A production-ready FastAPI skeleton project with Docker, Redis, Celery, and async support.
 
 ## Features
 
-- FastAPI backend with async support
-- PostgreSQL database with SQLAlchemy ORM
-- Pydantic models for data validation
-- Environment-based configuration
-- Docker and Docker Compose for development
-- API documentation with Swagger UI and ReDoc
+- 🚀 FastAPI backend with async support
+- 🐳 Docker and Docker Compose for development
+- 📦 Redis for caching and message broker
+- ⚡ Celery for background task processing
+- 🌸 Flower for Celery monitoring
+- 🔧 Environment-based configuration
+- 📚 Auto-generated API documentation (Swagger UI & ReDoc)
+- 🎯 CORS middleware configured
+- ✅ Health check endpoint
 
 ## Prerequisites
 
 - Docker and Docker Compose
 - Python 3.11+
-- Make (optional, for convenience commands)
 
 ## Getting Started
 
-1. Copy the example environment file:
+1. **Copy the example environment file:**
    ```bash
    cp .env.example .env
    ```
 
-2. Update the `.env` file with your configuration.
+2. **Update the `.env` file with your configuration.**
 
-3. Build and start the services:
+3. **Build and start the services:**
    ```bash
    docker-compose up -d --build
    ```
 
-4. Access the API documentation:
+4. **Access the services:**
+   - API: http://localhost:8000
    - Swagger UI: http://localhost:8000/docs
    - ReDoc: http://localhost:8000/redoc
-
-## API Endpoints
-
-- `POST /api/v1/leads/` - Create a new lead
-- `GET /api/v1/leads/` - List all leads
-- `GET /api/v1/leads/{lead_id}` - Get a specific lead
-
-## Development
-
-### Running Tests
-
-```bash
-docker-compose run --rm api pytest
-```
-
-### Database Migrations
-
-This project uses Alembic for database migrations. To create a new migration:
-
-```bash
-alembic revision --autogenerate -m "description of changes"
-```
-
-To apply migrations:
-
-```bash
-alembic upgrade head
-```
+   - Flower (Celery Monitor): http://localhost:5556
 
 ## Project Structure
 
@@ -70,19 +46,63 @@ app/
 ├── api/
 │   └── v1/
 │       └── endpoints/
-│           └── leads.py
-├── core/
-│   └── config.py
-├── db/
-│   └── base.py
-├── models/
-│   └── lead.py
-├── schemas/
-│   └── lead.py
-├── services/
-│   └── lead_service.py
-└── main.py
+│           └── example.py      # Example API endpoints
+├── config/
+│   └── settings.py             # Application settings
+├── tasks/
+│   └── example_tasks.py        # Example Celery tasks
+├── celery_config.py            # Celery configuration
+└── main.py                     # FastAPI application entry point
 ```
+
+## API Endpoints
+
+### Health Check
+- `GET /health` - Check API health status
+
+### Example Endpoints
+- `GET /api/v1/example/` - Example GET endpoint
+- `POST /api/v1/example/` - Example POST endpoint
+
+## Development
+
+### Running Without Docker
+
+1. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. Start Redis (required):
+   ```bash
+   docker run -d -p 6379:6379 redis:7-alpine
+   ```
+
+3. Run the API:
+   ```bash
+   uvicorn app.main:app --reload
+   ```
+
+4. Run Celery worker:
+   ```bash
+   celery -A app.celery_config.celery_app worker --loglevel=info
+   ```
+
+### Adding New Endpoints
+
+1. Create a new file in `app/api/v1/endpoints/`
+2. Define your router and endpoints
+3. Include the router in `app/main.py`
+
+### Adding Background Tasks
+
+1. Create task functions in `app/tasks/`
+2. Use `@celery_app.task` decorator
+3. Call tasks using `.delay()` or `.apply_async()`
+
+## Environment Variables
+
+See `.env.example` for all available configuration options.
 
 ## License
 
