@@ -1,6 +1,6 @@
-# Getting Started with FastAPI Skeleton
+# Getting Started with FastAPI Base Project
 
-This guide will help you get started with your new FastAPI skeleton project.
+This guide will help you get started with your new FastAPI base project.
 
 ## Quick Start
 
@@ -12,18 +12,22 @@ This guide will help you get started with your new FastAPI skeleton project.
 
 2. **Start all services with Docker:**
    ```bash
+   # Start only API and Redis (default)
    docker-compose up -d --build
+
+   # Start all services including Celery (if you want background tasks)
+   docker-compose --profile celery up -d --build
    ```
 
 3. **Verify everything is running:**
    - API: http://localhost:8000/health
    - API Docs: http://localhost:8000/docs
-   - Flower (Celery Monitor): http://localhost:5556
+   - Flower (Celery Monitor): http://localhost:5556 *(optional, only if using Celery)*
 
 ## Project Structure
 
 ```
-ai-chatbot/
+ai-base-project/
 ├── app/
 │   ├── api/
 │   │   └── v1/
@@ -66,7 +70,7 @@ curl -X POST http://localhost:8000/api/v1/example/ \
   -d '{"name": "Test Item", "value": 42}'
 ```
 
-### 5. Trigger Background Task
+### 5. Trigger Background Task *(Optional - requires Celery setup)*
 ```bash
 curl -X POST http://localhost:8000/task/example \
   -H "Content-Type: application/json" \

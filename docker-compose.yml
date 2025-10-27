@@ -25,6 +25,7 @@ services:
       timeout: 30s
       retries: 50
 
+  # Background task services (optional - only if using Celery)
   celery_worker:
     container_name: celery_worker
     build: .
@@ -36,6 +37,8 @@ services:
     depends_on:
       - api
       - redis
+    profiles:
+      - celery  # Only start with `docker-compose --profile celery up`
 
   flower:
     container_name: flower
@@ -49,7 +52,8 @@ services:
       - api
       - redis
       - celery_worker
-
+    profiles:
+      - celery  # Only start with `docker-compose --profile celery up`
 
 volumes:
   redis_data:
