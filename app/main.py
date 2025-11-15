@@ -2,6 +2,7 @@ from fastapi import FastAPI, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from .api.v1.endpoints import router as example_router
+from app.api.v1.endpoints.auth import router as auth_router
 from .config.settings import get_settings
 import logging
 import sys
@@ -48,6 +49,8 @@ def create_application() -> FastAPI:
 
     # Include API routers
     app.include_router(example_router, prefix="/api/v1")
+    app.include_router(auth_router)
+
 
     @app.get("/health")
     async def health_check():

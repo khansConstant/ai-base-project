@@ -4,6 +4,12 @@ uvicorn[standard]==0.24.0
 pydantic==2.5.0
 pydantic-settings==2.1.0
 python-dotenv==1.0.0
+supabase
+passlib[argon2]
+python-jose[cryptography]
+email-validator
+
+
 
 # Celery and Redis for background tasks
 celery==5.3.4
@@ -16,3 +22,7 @@ flower==2.0.1
 # psycopg2-binary==2.9.9   # For PostgreSQL
 # alembic==1.12.1          # For database migrations
 
+
+passlib[bcrypt]
+python-jose[cryptography]
+supabase
